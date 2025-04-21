@@ -6,7 +6,7 @@ import (
 )
 
 type Screen struct {
-	Enabled    bool
+	enabled    bool
 	Width      int
 	Height     int
 	cells      [][]Cell
@@ -14,7 +14,7 @@ type Screen struct {
 }
 
 type Cell struct {
-	Color BackgroundColor
+	color Color
 	x, y  int
 }
 
@@ -30,7 +30,7 @@ func newScreen(width, height int) *Screen {
 	for y := range height {
 		cells[y] = make([]Cell, width)
 		for x := range cells[y] {
-			cells[y][x] = Cell{x: x, y: y, Color: BlackColor}
+			cells[y][x] = Cell{x: x, y: y, color: BlackColor}
 			dirtyCells = append(dirtyCells, cells[y][x])
 		}
 	}
@@ -40,9 +40,9 @@ func newScreen(width, height int) *Screen {
 	return screen
 }
 
-func (s *Screen) SetCell(x, y int, color BackgroundColor) {
+func (s *Screen) SetCell(x, y int, color Color) {
 	cell := s.cells[y][x]
-	cell.Color = color
+	cell.color = color
 	s.cells[y][x] = cell
 
 	s.dirtyCells = append(s.dirtyCells, cell)
@@ -54,7 +54,7 @@ func (s *Screen) render() {
 	// Render only dirty cells
 	for _, cell := range s.dirtyCells {
 		builder.WriteString(GetMoveCursorCode(cell.x, cell.y))
-		builder.WriteString(GetSetBackgroundColorCode(cell.Color))
+		builder.WriteString(GetSetBackgroundColorCode(cell.color))
 		builder.WriteString(EMPTY)
 	}
 

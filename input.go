@@ -31,11 +31,9 @@ func getInput(ch <-chan []byte) Input {
 			//Kind of bad to assume any 6 byte slice is guaranteed to be a mouse input, but... meh
 			mouseInput := getMouseInput([6]byte(b))
 			return Input{Mouse: &mouseInput}
-
 		}
 	default: //Do nothing
 	}
-
 	return Input{}
 }
 

@@ -8,14 +8,14 @@ import (
 	"golang.org/x/term"
 )
 
-type TerminalApp struct {
-	Running  bool
+type TerminalGame struct {
 	Screen   *Screen
-	Fd       int
-	Elements []AppElement
+	Elements []GameElement
+	running  bool
+	fd       int
 }
 
-type AppElement interface {
+type GameElement interface {
 	Update(delta float64, input Input)
 	Render(screen *Screen)
 }
@@ -23,7 +23,7 @@ type AppElement interface {
 const TARGET_FPS = 60
 const TARGET_FRAME_TIME = time.Second / TARGET_FPS
 
-func NewApp() (*TerminalApp, error) {
+func NewGame() (*TerminalGame, error) {
 	fd := int(os.Stdin.Fd())
 	width, height, err := term.GetSize(fd)
 	if err != nil {
@@ -31,52 +31,52 @@ func NewApp() (*TerminalApp, error) {
 	}
 
 	screen := newScreen(width, height)
-	return &TerminalApp{
-		Running:  false,
+	return &TerminalGame{
+		running:  false,
 		Screen:   screen,
-		Fd:       fd,
-		Elements: make([]AppElement, 0),
+		fd:       fd,
+		Elements: make([]GameElement, 0),
 	}, nil
 }
 
-func (app *TerminalApp) AddElement(el AppElement) {
-	app.Elements = append(app.Elements, el)
+func (game *TerminalGame) AddElement(el GameElement) {
+	game.Elements = append(game.Elements, el)
 }
 
-func (app *TerminalApp) Start() {
-	app.Screen.enable()
-	defer app.Screen.disable()
+func (game *TerminalGame) Start() {
+	game.Screen.enable()
+	defer game.Screen.disable()
 
 	//Raw terminal
-	oldState, err := term.MakeRaw(app.Fd)
+	oldState, err := term.MakeRaw(game.fd)
 	if err != nil {
 		panic(err)
 	}
-	defer term.Restore(app.Fd, oldState)
+	defer term.Restore(game.fd, oldState)
 
 	//Run loop
-	run(app)
+	run(game)
 }
 
-func run(app *TerminalApp) {
-	app.Running = true
+func run(game *TerminalGame) {
+	game.running = true
 
 	inputCh := getInputChannel()
 
 	last := time.Now()
-	for app.Running {
+	for game.running {
 		now := time.Now()
 		delta := now.Sub(last).Seconds()
 		last = now
 
 		input := getInput(inputCh)
 
-		update(app, delta, input)
+		update(game, delta, input)
 
-		render(app)
+		render(game)
 	
 		//Print FPS
-		fmt.Printf("\x1b[%d;1H\x1b[2KFPS: %d", app.Screen.Height+1, int(1.0/delta))
+		fmt.Printf("\x1b[%d;1H\x1b[2KFPS: %d", game.Screen.Height+1, int(1.0/delta))
 
 		//Target FPS 
 		elapsed := time.Since(now)
@@ -86,17 +86,17 @@ func run(app *TerminalApp) {
 	}
 }
 
-func update(app *TerminalApp, delta float64, input Input) {
+func update(game *TerminalGame, delta float64, input Input) {
 	if input.Key == 'q' {
-		app.Running = false
+		game.running = false
 	}
 
-	for _, element := range app.Elements {
+	for _, element := range game.Elements {
 		element.Update(delta, input)
 	}
 }
 
-func render(app *TerminalApp) {
+func render(app *TerminalGame) {
 	for _, element := range app.Elements {
 		element.Render(app.Screen)
 	}
