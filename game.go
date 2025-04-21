@@ -16,8 +16,7 @@ type TerminalGame struct {
 }
 
 type GameElement interface {
-	Update(delta float64, input Input)
-	Render(screen *Screen)
+	Update(screen *Screen, delta float64, input Input)
 }
 
 const TARGET_FPS = 60
@@ -73,12 +72,12 @@ func run(game *TerminalGame) {
 
 		update(game, delta, input)
 
-		render(game)
-	
-		//Print FPS
-		fmt.Printf("\x1b[%d;1H\x1b[2KFPS: %d", game.Screen.Height+1, int(1.0/delta))
+		game.Screen.render()
 
-		//Target FPS 
+		//Print FPS
+		fmt.Printf("\x1b[%d;1H\x1b[2K FPS: %d", game.Screen.Height, int(1.0/delta))
+
+		//Target FPS
 		elapsed := time.Since(now)
 		if sleepTime := TARGET_FRAME_TIME - elapsed; sleepTime > 0 {
 			time.Sleep(sleepTime)
@@ -92,14 +91,6 @@ func update(game *TerminalGame, delta float64, input Input) {
 	}
 
 	for _, element := range game.Elements {
-		element.Update(delta, input)
+		element.Update(game.Screen, delta, input)
 	}
-}
-
-func render(app *TerminalGame) {
-	for _, element := range app.Elements {
-		element.Render(app.Screen)
-	}
-
-	app.Screen.render()
 }

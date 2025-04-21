@@ -41,6 +41,10 @@ func newScreen(width, height int) *Screen {
 }
 
 func (s *Screen) SetCell(x, y int, color Color) {
+	if y >= len(s.cells) || x >= len(s.cells[y]) {
+		return
+	}
+
 	cell := s.cells[y][x]
 	cell.color = color
 	s.cells[y][x] = cell
@@ -66,15 +70,13 @@ func (s *Screen) render() {
 }
 
 func (s *Screen) enable() {
-	SaveCursor()
-	SaveScreen()
 	SetCursorInvisible()
 	EnableMouseTracking()
 }
 
 func (s *Screen) disable() {
-	RestoreScreen()
-	RestoreCursor()
+	EraseScreen()
+	MoveCursor(0, 0)
 	SetCursorVisible()
 	DisableMouseTracking()
 }
