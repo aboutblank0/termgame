@@ -47,15 +47,16 @@ func SetBackgroundColor(color Color)               { printAnsi(fmt.Sprintf("[48;
 func GetSetBackgroundColorCode(color Color) string { return fmt.Sprintf("%c[48;5;%dm", ESC, color) }
 
 // Mouse
-func EnableMouseTracking()  {
-	printAnsi("[?1000h") 
-	printAnsi("[?1006h") 
+func EnableMouseTracking() {
+	printAnsi("[?1000h")
+	printAnsi("[?1003h")
+	printAnsi("[?1006h")
 }
 
 func DisableMouseTracking() {
-	printAnsi("[?1000l") 
-	printAnsi("[?1006l") 
+	printAnsi("[?1000l")
+	printAnsi("[?1003l")
+	printAnsi("[?1006l")
 }
-
 
 func ResetAttributes() { printAnsi("[0m") }

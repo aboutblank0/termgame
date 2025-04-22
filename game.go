@@ -9,8 +9,9 @@ import (
 )
 
 type TerminalGame struct {
-	Screen   *Screen
-	Elements []GameElement
+	screen   *Screen
+	input    *Input
+	elements []GameElement
 	running  bool
 	fd       int
 }
@@ -30,21 +31,24 @@ func NewGame() (*TerminalGame, error) {
 	}
 
 	screen := newScreen(width, height)
+	input := newInput()
+
 	return &TerminalGame{
 		running:  false,
-		Screen:   screen,
+		screen:   screen,
+		input:    input,
 		fd:       fd,
-		Elements: make([]GameElement, 0),
+		elements: make([]GameElement, 0),
 	}, nil
 }
 
 func (game *TerminalGame) AddElement(el GameElement) {
-	game.Elements = append(game.Elements, el)
+	game.elements = append(game.elements, el)
 }
 
 func (game *TerminalGame) Start() {
-	game.Screen.enable()
-	defer game.Screen.disable()
+	game.screen.enable()
+	defer game.screen.disable()
 
 	//Raw terminal
 	oldState, err := term.MakeRaw(game.fd)
@@ -60,22 +64,20 @@ func (game *TerminalGame) Start() {
 func run(game *TerminalGame) {
 	game.running = true
 
-	inputCh := getInputChannel()
-
 	last := time.Now()
 	for game.running {
 		now := time.Now()
 		delta := now.Sub(last).Seconds()
 		last = now
 
-		input := getInput(inputCh)
+		game.input.refresh()
 
-		update(game, delta, input)
+		update(game, delta)
 
-		game.Screen.render()
+		game.screen.render()
 
 		//Print FPS
-		fmt.Printf("\x1b[%d;1H\x1b[2K FPS: %d", game.Screen.Height, int(1.0/delta))
+		fmt.Printf("\x1b[%d;1H\x1b[2K FPS: %d", game.screen.Height, int(1.0/delta))
 
 		//Target FPS
 		elapsed := time.Since(now)
@@ -85,12 +87,12 @@ func run(game *TerminalGame) {
 	}
 }
 
-func update(game *TerminalGame, delta float64, input Input) {
-	if input.Key == 'q' {
+func update(game *TerminalGame, delta float64) {
+	if game.input.GetKeyDown('q') {
 		game.running = false
 	}
 
-	for _, element := range game.Elements {
-		element.Update(game.Screen, delta, input)
+	for _, element := range game.elements {
+		element.Update(game.screen, delta, *game.input)
 	}
 }

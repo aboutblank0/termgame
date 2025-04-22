@@ -1,86 +1,114 @@
 package termgame
 
 import (
+	"errors"
 	"os"
 	"strconv"
 	"strings"
 )
 
+// TODO: Keep some sort of state for input. So that we can easily check when mouse is up/down.
+// Probably keep a pointer to Input in TerminalGame struct
 type Input struct {
-	Key   byte
-	Mouse MouseInput
+	inputChannel chan []byte
+	keys         [256]bool
+	mouseButtons [3]bool
+
+	Mouse Position
 }
 
-type MouseInput struct {
-	X       int
-	Y       int
-	Button  ButtonType
-	Pressed bool
+type Position struct {
+	X, Y int
 }
 
-type ButtonType int
+const BUFFER_SIZE = 512
 
-const (
-	LeftClick   = 0
-	MiddleClick = 1
-	RightClick  = 2
-)
-
-func getInputChannel() <-chan []byte {
-	inputCh := make(chan []byte)
+func newInput() *Input {
+	inputCh := make(chan []byte, BUFFER_SIZE)
 	go readInputLoop(inputCh)
-	return inputCh
-}
 
-func getInput(ch <-chan []byte) Input {
-	select {
-	case b := <-ch:
-		parseSGR(b)
-		switch len(b) {
-		case 1:
-			return Input{Key: b[0]}
-		default:
-			//Kind of bad to assume any 6 byte slice is guaranteed to be a mouse input, but... meh
-			mouseInput := parseSGR(b)
-			return Input{Mouse: mouseInput}
-		}
-	default: //Do nothing
+	return &Input{
+		inputChannel: inputCh,
 	}
-	return Input{}
 }
 
-// TODO: More efficient parsing
-func parseSGR(bytes []byte) MouseInput {
+func (in Input) GetKeyDown(key byte) bool {
+	return in.keys[key]
+}
+
+func (in Input) GetMouseButtonDown(button int) bool {
+	return in.mouseButtons[button]
+}
+
+func (in *Input) refresh() {
+	var keys [256]bool
+	var mousePosition *Position
+
+	for {
+		select {
+		case b := <-in.inputChannel:
+			switch len(b) {
+			case 1:
+				keys[b[0]] = true
+			default:
+				mouseInput, valid := parseSGR(b)
+				if valid {
+					if mouseInput.button > 2 { //Mouse move "buttons"
+						mousePosition = &mouseInput.pos
+					} else {
+						in.mouseButtons[mouseInput.button] = (mouseInput.eventType == 'M')
+						mousePosition = &mouseInput.pos
+					}
+				}
+			}
+		default: //No more data in channel
+			in.keys = keys
+			if mousePosition != nil {
+				in.Mouse = *mousePosition
+			}
+			return
+		}
+	}
+}
+
+type SGREvent struct {
+	button    int
+	eventType byte
+	pos       Position
+}
+
+// TODO: More efficient parsing (don't use strings)
+// Also, do this in the input goroutine, so that parsing doesn't "add" to the frame time
+func parseSGR(bytes []byte) (SGREvent, bool) {
 	str := string(bytes)
 
 	if !strings.HasPrefix(str, "\x1b[<") {
-		return MouseInput{}
+		panic(errors.New("Parsing input []byte that is not SGR ?"))
 	}
 
 	body := str[3 : len(str)-1]
 	parts := strings.Split(body, ";")
 	if len(parts) != 3 {
-		return MouseInput{}
+		return SGREvent{}, false
 	}
 
 	button, err1 := strconv.Atoi(parts[0])
 	x, err2 := strconv.Atoi(parts[1])
 	y, err3 := strconv.Atoi(parts[2])
 	if err1 != nil || err2 != nil || err3 != nil {
-		return MouseInput{}
+		return SGREvent{}, false
 	}
-	eventType := str[len(str)-1] // 'M' or 'm'
 
-	return MouseInput{
-		X:       x,
-		Y:       y,
-		Button:  ButtonType(button),
-		Pressed: eventType == 'M',
-	}
+	eventType := str[len(str)-1] // 'M' or 'm'
+	return SGREvent{
+		button: button,
+		pos:    Position{X: x, Y: y},
+		eventType: eventType,
+	}, true
 }
 
 func readInputLoop(inputCh chan<- []byte) {
-	inputBuffer := make([]byte, 32)
+	inputBuffer := make([]byte, 64)
 	for {
 		n, err := os.Stdin.Read(inputBuffer)
 		if err == nil && n > 0 {
