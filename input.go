@@ -10,9 +10,10 @@ import (
 // TODO: Keep some sort of state for input. So that we can easily check when mouse is up/down.
 // Probably keep a pointer to Input in TerminalGame struct
 type Input struct {
-	inputChannel chan []byte
-	keys         [256]bool
-	mouseButtons [3]bool
+	inputChannel        chan []byte
+	keys                [256]bool
+	mouseButtons        [3]bool
+	frameMousePositions []Position
 
 	Mouse Position
 }
@@ -40,9 +41,17 @@ func (in Input) GetMouseButtonDown(button int) bool {
 	return in.mouseButtons[button]
 }
 
+// Desperately needs a new name lol.
+// This function returns all the cells the mouse moved "past" in between the last frame and this one.
+func (in Input) GetAllFrameMousePositions() []Position {
+	return in.frameMousePositions
+}
+
 func (in *Input) refresh() {
 	var keys [256]bool
-	var mousePosition *Position
+	var finalMousePosition *Position
+	seenMousePositions := make(map[Position]bool)
+	var uniqueMousePositions []Position
 
 	for {
 		select {
@@ -53,18 +62,23 @@ func (in *Input) refresh() {
 			default:
 				mouseInput, valid := parseSGR(b)
 				if valid {
-					if mouseInput.button > 2 { //Mouse move "buttons"
-						mousePosition = &mouseInput.pos
-					} else {
+					if mouseInput.button <= 2 { //Mouse move "buttons"
 						in.mouseButtons[mouseInput.button] = (mouseInput.eventType == 'M')
-						mousePosition = &mouseInput.pos
 					}
+
+					if _, exists := seenMousePositions[mouseInput.pos]; !exists {
+						seenMousePositions[mouseInput.pos] = true
+						uniqueMousePositions = append(uniqueMousePositions, mouseInput.pos)
+					}
+
+					finalMousePosition = &mouseInput.pos
 				}
 			}
 		default: //No more data in channel
 			in.keys = keys
-			if mousePosition != nil {
-				in.Mouse = *mousePosition
+			in.frameMousePositions = uniqueMousePositions
+			if finalMousePosition != nil {
+				in.Mouse = *finalMousePosition
 			}
 			return
 		}
@@ -101,8 +115,8 @@ func parseSGR(bytes []byte) (SGREvent, bool) {
 
 	eventType := str[len(str)-1] // 'M' or 'm'
 	return SGREvent{
-		button: button,
-		pos:    Position{X: x, Y: y},
+		button:    button,
+		pos:       Position{X: x, Y: y},
 		eventType: eventType,
 	}, true
 }

@@ -6,8 +6,8 @@ import (
 
 type Painter struct {
 	Painting bool
-	Game  *termgame.TerminalGame
-	Color termgame.Color
+	Game     *termgame.TerminalGame
+	Color    termgame.Color
 }
 
 func main() {
@@ -30,5 +30,10 @@ func (painter *Painter) Update(screen *termgame.Screen, delta float64, input ter
 
 	if painter.Painting {
 		screen.SetCell(input.Mouse.X, input.Mouse.Y, painter.Color)
+
+		poses := input.GetAllFrameMousePositions()
+		for _, pos := range poses {
+			screen.SetCell(pos.X, pos.Y, painter.Color)
+		}
 	}
 }
